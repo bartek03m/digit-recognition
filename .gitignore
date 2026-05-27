@@ -182,3 +182,5 @@ cython_debug/
 
 dataset/
 todo.txt
+debug.png
+digit-recognizer.keras
