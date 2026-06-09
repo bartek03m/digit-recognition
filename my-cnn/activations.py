@@ -1,17 +1,39 @@
 import numpy as np
 
 class ReLU:
+    def __init__(self):
+        self.input = None
+        self.output = None
+
     def forward(self, input):
-        return np.maximum(0, input)
+        self.input = input
+        self.output = np.maximum(0, input)
+        return self.output
+    
     
 class Softmax:
+    def __init__(self):
+        self.input = None
+        self.output = None
+
     def forward(self, input):
-        input = input - np.max(input)
-        exps = np.exp(input)
-        return exps / np.sum(exps)
+        self.input = input
+        max_vals = np.max(input, axis=1, keepdims=True)
+        exps = np.exp(input - max_vals)
+        self.output = exps / np.sum(exps, axis=1, keepdims=True)
+        return self.output
+    
+    
 class Linear:
+    def __init__(self):
+        self.input = None
+        self.output = None 
+
     def forward(self, input):
-        return input
+        self.input = input
+        self.output = input
+        return self.output
+    
     
 def get_activation(name):
     if name is None:
