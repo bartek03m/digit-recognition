@@ -2,10 +2,9 @@ import numpy as np
 import activations
  
 class Input:
-    def __init__(self, shape, batch_shape=1):
+    def __init__(self, shape):
         # Add validation
         self.shape = shape
-        self.batch_size = batch_shape
         
     def forward(self, input):
         # Add validation
