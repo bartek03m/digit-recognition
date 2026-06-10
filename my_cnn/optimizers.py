@@ -1,3 +1,5 @@
+import numpy as np
+
 class SGD:
     def __init__(self):
         self.layers = None
@@ -12,10 +14,13 @@ class SGD:
             if hasattr(layer, 'weight_gradient') and layer.weight_gradient is not None:
                 layer.weights -= self.learning_rate * layer.weight_gradient
                 layer.biases -= self.learning_rate * layer.bias_gradient
+    
 
 def get_optimizer(name):
     if name is None:
         return SGD()
+    elif name.lower() == 'adam':
+        return Adam()
     elif name.lower() == 'sgd':
         return SGD()
     else:

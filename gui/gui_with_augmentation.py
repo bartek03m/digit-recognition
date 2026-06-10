@@ -10,7 +10,7 @@ class DigitRecognizerApp:
         self.root.resizable(False, False)
         
         try:
-            self.model = tf.keras.models.load_model('digit-recognizer.keras')
+            self.model = tf.keras.models.load_model('models/digit-recognizer-with-augmentation.keras')
             print("Model załadowany pomyślnie!")
         except Exception as e:
             print(f"Błąd podczas ładowania modelu: {e}")
@@ -71,7 +71,7 @@ class DigitRecognizerApp:
         offset_y = (28 - new_size[1]) // 2
         final_image.paste(resized, (offset_x, offset_y))
         
-        final_image.save("debug.png")
+        # final_image.save("debug.png")
 
         img_array = np.array(final_image)
         img_array = img_array.reshape(1, 28, 28, 1).astype('float32')

@@ -12,6 +12,7 @@ class CrossEntropy:
     def backward(self, y_true, y_pred, batch_size):
         return (y_pred - y_true) / batch_size
     
+    
 def get_loss(name):
     if name is None:
         return CrossEntropy()

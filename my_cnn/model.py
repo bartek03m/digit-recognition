@@ -1,6 +1,7 @@
+import pickle
 import numpy as np
-import optimizers
-import losses
+from . import optimizers
+from . import losses
 
 class Model:
     def __init__(self):
@@ -12,7 +13,7 @@ class Model:
     def add(self, layer):
         self.layers.append(layer)
 
-    def compile(self, optimizer, loss, learning_rate=0.05):
+    def compile(self, optimizer, loss, learning_rate=0.001):
         self.optimizer = optimizers.get_optimizer(optimizer)
         self.optimizer.lazy_load(self.layers, learning_rate)
         self.loss = losses.get_loss(loss)
@@ -21,19 +22,26 @@ class Model:
         out = self.layers[0].forward(X)
         for i in range(1, len(self.layers)):
              out = self.layers[i].forward(out)
-
         return out
     
     def back_prop(self, grad):
         for i in range(len(self.layers)-1, -1, -1):
            grad = self.layers[i].backward(grad)
-        
         return grad
-        
 
-    
-    def fit(self, X, y, epochs=3, batch_size=32):
+    def save(self, filepath="model.pkl"):
+        with open(filepath, 'wb') as f:
+            pickle.dump(self, f)
+        print(f"Model zapisany pomyślnie do pliku: {filepath}")
+
+    @classmethod
+    def load(cls, filepath="model.pkl"):
+        with open(filepath, 'rb') as f:
+            model = pickle.load(f)
+        print(f"Model załadowany pomyślnie z pliku: {filepath}")
+        return model
         
+    def fit(self, X, y, epochs=3, batch_size=32):
         samples = X.shape[0]
 
         for epoch in range(epochs):
@@ -64,12 +72,15 @@ class Model:
                 
             print(f"\nLoss: {total_loss/samples:.4f}, Accuracy: {correct_predictions/samples:.4f}")
                 
+    def evaluate(self, X, y):
+        y_pred = self.predict(X)
 
+        loss_val = self.loss.forward(y, y_pred)
 
+        preds = np.argmax(y_pred, axis=1)
+        trues = np.argmax(y, axis=1)
+        acc = np.sum(preds==trues) / len(y)
 
-    def evaluate(X, y):
-        pass
-
-        
+        return loss_val, acc        
 
 

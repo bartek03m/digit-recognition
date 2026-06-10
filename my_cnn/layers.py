@@ -1,13 +1,11 @@
 import numpy as np
-import activations
+from . import activations
  
 class Input:
     def __init__(self, shape):
-        # Add validation
         self.shape = shape
         
     def forward(self, input):
-        # Add validation
         return input
     
     def backward(self, upstream_gradient):
@@ -59,10 +57,9 @@ class Convolution2D:
         
         for out_row, win_row in enumerate(range(0, input_height, self.strides)):
             for out_col, win_col in enumerate(range(0, input_width, self.strides)):
-                for batch in range(batch_size):              
-                    patch = input[batch, win_row : win_row+self.kernel_size, win_col : win_col+self.kernel_size, :]
-                    for k in range(self.no_of_filters):
-                        output[batch, out_row, out_col, k] = np.sum(patch * self.weights[k]) + self.biases[k]
+                patch = input[:, win_row : win_row+self.kernel_size, win_col : win_col+self.kernel_size, :]
+                for k in range(self.no_of_filters):
+                    output[:, out_row, out_col, k] = np.sum(patch * self.weights[k], axis=(1, 2, 3)) + self.biases[k]
         output = self.activation_func.forward(output)
         return output
     
@@ -79,12 +76,12 @@ class Convolution2D:
                 
         for out_row, win_row in enumerate(range(0, input_height, self.strides)):
             for out_col, win_col in enumerate(range(0, input_width, self.strides)):
-                for b in range(batch_size):              
-                    patch = input_padded[b, win_row : win_row+self.kernel_size, win_col : win_col+self.kernel_size, :]
-                    for k in range(self.no_of_filters):
-                        d = upstream_gradient[b, out_row, out_col, k]
-                        self.weight_gradient[k] += d * patch
-                        downstream_padded[b, win_row : win_row+self.kernel_size, win_col : win_col+self.kernel_size, :] += d * self.weights[k]
+                patch = input_padded[:, win_row : win_row+self.kernel_size, win_col : win_col+self.kernel_size, :]
+                for k in range(self.no_of_filters):
+                    d = upstream_gradient[:, out_row, out_col, k]
+                    d_reshaped = d[:, None, None, None]
+                    self.weight_gradient[k] += np.sum(d_reshaped * patch, axis=0)
+                    downstream_padded[:, win_row : win_row+self.kernel_size, win_col : win_col+self.kernel_size, :] += d_reshaped * self.weights[k]
         if pad > 0:
             return downstream_padded[:, pad : -pad, pad : -pad, :]
         return downstream_padded
@@ -105,10 +102,8 @@ class MaxPooling2D:
         
         for out_row, win_row in enumerate(range(0, input_height, self.pool_size)):
             for out_col, win_col in enumerate(range(0, input_width, self.pool_size)):
-                for b in range(batch_size):              
-                    pool = input[b, win_row : win_row+self.pool_size, win_col : win_col+self.pool_size, :]
-                    output[b, out_row, out_col] = np.max(pool, axis=(0, 1))
-                
+                pool = input[:, win_row : win_row+self.pool_size, win_col : win_col+self.pool_size, :]
+                output[:, out_row, out_col] = np.max(pool, axis=(1, 2))
         return output
     
     def backward(self, upstream_gradient):
@@ -123,7 +118,6 @@ class MaxPooling2D:
                         flat_idx = np.argmax(pool[:, :, c])
                         local_i, local_j = np.unravel_index(flat_idx, (self.pool_size, self.pool_size))
                         downstream_gradient[b, win_row + local_i, win_col + local_j, c] = upstream_gradient[b, out_row, out_col, c]
-                
         return downstream_gradient
 
                 
