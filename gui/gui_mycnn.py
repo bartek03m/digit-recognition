@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
 import tkinter as tk
 from PIL import Image, ImageDraw
 import numpy as np
@@ -11,7 +15,7 @@ class DigitRecognizerApp:
         
         try:
             self.model = my_cnn.Model.load('models/custom_cnn.pkl')
-            print("Twój własny model z my-cnn załadowany pomyślnie!")
+            print("Własny model załadowany pomyślnie")
         except Exception as e:
             print(f"Błąd podczas ładowania modelu: {e}")
             self.model = None
