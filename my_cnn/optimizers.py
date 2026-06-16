@@ -19,8 +19,6 @@ class SGD:
 def get_optimizer(name):
     if name is None:
         return SGD()
-    elif name.lower() == 'adam':
-        return Adam()
     elif name.lower() == 'sgd':
         return SGD()
     else:
