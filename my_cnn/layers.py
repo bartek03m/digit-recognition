@@ -79,22 +79,36 @@ class Convolution2D:
     def backward(self, upstream_gradient):
         batch_size, input_height, input_width, input_channels = self.input.shape
         upstream_gradient *= self.activation_func.backward()
-
-        self.weight_gradient = np.zeros(self.weights.shape)
-        self.bias_gradient = np.sum(upstream_gradient, axis=(0, 1, 2))
-
+        
         pad = self.kernel_size // 2
-        input_padded = np.pad(self.input, ((0,0),(pad,pad),(pad,pad),(0,0)))
-        downstream_padded = np.zeros_like(input_padded)
-                
-        for out_row, win_row in enumerate(range(0, input_height, self.strides)):
-            for out_col, win_col in enumerate(range(0, input_width, self.strides)):
-                patch = input_padded[:, win_row : win_row+self.kernel_size, win_col : win_col+self.kernel_size, :]
-                for k in range(self.no_of_filters):
-                    d = upstream_gradient[:, out_row, out_col, k]
-                    d_reshaped = d[:, None, None, None]
-                    self.weight_gradient[k] += np.sum(d_reshaped * patch, axis=0)
-                    downstream_padded[:, win_row : win_row+self.kernel_size, win_col : win_col+self.kernel_size, :] += d_reshaped * self.weights[k]
+        input = np.pad(self.input, ((0,0),(pad,pad),(pad,pad),(0,0)))
+        
+        windows = sliding_window_view(input, (self.kernel_size, self.kernel_size), axis=(1,2))
+        windows = windows [:, ::self.strides, ::self.strides, :, :, :]
+        windows = windows.transpose(0, 1, 2, 4, 5, 3)
+
+        _, output_height, output_width, _ = upstream_gradient.shape
+        
+        self.bias_gradient = np.sum(upstream_gradient, axis=(0, 1, 2))
+        
+        patches = windows.reshape(batch_size * output_height * output_width, -1)
+        upstream_flat = upstream_gradient.reshape(batch_size * output_height * output_width, self.no_of_filters)
+        
+        self.weight_gradient = (upstream_flat.T @ patches).reshape(self.weights.shape)
+
+        # col2im
+        weights_flat = self.weights.reshape(self.no_of_filters, -1)
+        grad_cols = (upstream_flat @ weights_flat).reshape(
+            batch_size, output_height, output_width, self.kernel_size, self.kernel_size, input_channels
+        )
+
+        downstream_padded = np.zeros_like(input)
+        for oh in range(output_height):
+            for ow in range(output_width):
+                r = oh * self.strides
+                c = ow * self.strides
+                downstream_padded[:, r:r+self.kernel_size, c:c+self.kernel_size, :] += grad_cols[:, oh, ow, :, :, :]
+
         if pad > 0:
             return downstream_padded[:, pad : -pad, pad : -pad, :]
         return downstream_padded
