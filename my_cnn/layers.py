@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 from . import activations
  
 class Input:
@@ -51,15 +52,27 @@ class Convolution2D:
         pad = self.kernel_size // 2
         input = np.pad(input, ((0, 0), (pad, pad), (pad, pad), (0, 0)))
         
-        output_height = len(range(0, input_height, self.strides))
-        output_width = len(range(0, input_width, self.strides))
-        output = np.zeros((batch_size, output_height, output_width, self.no_of_filters))
+        # wbudowane okno przesuwne, które chodzi co 1 pixel 
+        windows = sliding_window_view(input, (self.kernel_size, self.kernel_size), axis=(1,2))
         
-        for out_row, win_row in enumerate(range(0, input_height, self.strides)):
-            for out_col, win_col in enumerate(range(0, input_width, self.strides)):
-                patch = input[:, win_row : win_row+self.kernel_size, win_col : win_col+self.kernel_size, :]
-                for k in range(self.no_of_filters):
-                    output[:, out_row, out_col, k] = np.sum(patch * self.weights[k], axis=(1, 2, 3)) + self.biases[k]
+        # uwzględnienie większego kroku [N, H_out, W_out, C, kH, kW]
+        windows = windows[:, ::self.strides, ::self.strides, :, :, :]
+        
+        # [N, H_out, W_out, kH, kW, C]
+        windows = windows.transpose(0, 1, 2, 4, 5, 3)
+        
+        output_height, output_width = windows.shape[1], windows.shape[2]
+        
+        # spłaszczenie
+        patches = windows.reshape(batch_size * output_height * output_width, -1)
+        weights_flat = self.weights.reshape(self.no_of_filters, -1)
+        
+        # mnożenie macierzy
+        output = patches @ weights_flat.T + self.biases
+        
+        # sklejenie z powrotem w obrazki
+        output = output.reshape(batch_size, output_height, output_width, self.no_of_filters)
+        
         output = self.activation_func.forward(output)
         return output
     
