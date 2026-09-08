@@ -33,6 +33,20 @@ class Model:
         return grad
 
     def save(self, filepath="model.pkl"):
+        # clear cache before saving to keep file size small
+        for layer in self.layers:
+            if hasattr(layer, 'input'):
+                layer.input = None
+            if hasattr(layer, 'activation_func') and hasattr(layer.activation_func, 'input'):
+                layer.activation_func.input = None
+            if hasattr(layer, 'weight_gradient'):
+                layer.weight_gradient = None
+            if hasattr(layer, 'bias_gradient'):
+                layer.bias_gradient = None
+            if hasattr(layer, 'v_w'):
+                layer.v_w = None
+            if hasattr(layer, 'v_b'):
+                layer.v_b = None
         with open(filepath, 'wb') as f:
             pickle.dump(self, f)
         print(f"Model saved to: {filepath}")
@@ -44,18 +58,25 @@ class Model:
         print(f"Model loaded from: {filepath}")
         return model
         
-    def fit(self, X, y, epochs=3, batch_size=32):
+    def fit(self, X, y, epochs=3, batch_size=32, shuffle=True):
         samples = X.shape[0]
+        total_batches = (samples + batch_size - 1) // batch_size
 
         for epoch in range(epochs):
-            print(f"Epoch: {epoch+1} / {epochs}")
             total_loss = 0
             correct_predictions = 0
+
+            # shuffle indices at the start of each epoch
+            if shuffle:
+                indices = np.random.permutation(samples)
+            else:
+                indices = np.arange(samples)
+
             # go through data in batches
-            for i in range(0, samples, batch_size):
-                print(".", end='', flush=True)
-                X_batch = X[i : i+batch_size]
-                y_batch = y[i : i+batch_size]
+            for batch_idx, i in enumerate(range(0, samples, batch_size), 1):
+                batch_indices = indices[i : i+batch_size]
+                X_batch = X[batch_indices]
+                y_batch = y[batch_indices]
 
                 # forward
                 y_pred = self.predict(X_batch)
@@ -78,8 +99,13 @@ class Model:
                 # update weights
                 self.optimizer.update()
 
-                
-            print(f"\nLoss: {total_loss/samples:.4f}, Accuracy: {correct_predictions/samples:.4f}")
+                # show progress
+                processed = i + len(X_batch)
+                curr_loss = total_loss / processed
+                curr_acc = correct_predictions / processed
+                print(f"\rEpoch {epoch+1}/{epochs} | Batch {batch_idx}/{total_batches} | Loss: {curr_loss:.4f} | Acc: {curr_acc:.4f}", end='', flush=True)
+
+            print()
                 
     def evaluate(self, X, y):
         y_pred = self.predict(X)
