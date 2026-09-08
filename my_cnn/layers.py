@@ -20,11 +20,9 @@ class Rescaling:
         self.scale = scale
     
     def forward(self, input):
-        # multiply each pixel value by the scale factor
         return input * self.scale
 
     def backward(self, upstream_gradient):
-        # chain rule - gradient flows through scaled by the same factor
         return upstream_gradient * self.scale
     
     
@@ -144,9 +142,12 @@ class MaxPooling2D:
     def forward(self, input):
         self.input = input
         # split into pool_size x pool_size windows
+        
         windows = sliding_window_view(input, (self.pool_size, self.pool_size), axis=(1, 2))
+        
         # non-overlapping - step by pool_size
         windows = windows[:, ::self.pool_size, ::self.pool_size, :, :, :]
+        
         # pick the max from each window
         output = np.max(windows, axis=(4, 5))
         return output
@@ -162,7 +163,7 @@ class MaxPooling2D:
         # find where the max was in each window
         flat_windows = windows.reshape(*windows.shape[:4], -1)
         max_indices = np.argmax(flat_windows, axis=4)  # (N, out_h, out_w, C)
-        _, output_height, output_widht, _ = upstream_gradient.shape
+        _, output_height, output_width, _ = upstream_gradient.shape
 
         # convert flat index back to 2D row/col offset within the pool window
         max_i = max_indices // self.pool_size  # row offset
@@ -171,7 +172,7 @@ class MaxPooling2D:
         # build index arrays with broadcasting-friendly shapes
         n_idx = np.arange(batch_size)[:, None, None, None]       # batch axis
         oh_idx = np.arange(output_height)[None, :, None, None]   # output row axis
-        ow_idx = np.arange(output_widht)[None, None, :, None]    # output col axis
+        ow_idx = np.arange(output_width)[None, None, :, None]    # output col axis
         c_idx = np.arange(input_channels)[None, None, None, :]   # channel axis
 
         # actual position in the full input
