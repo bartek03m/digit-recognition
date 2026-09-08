@@ -51,11 +51,12 @@ class Convolution2D:
         self.input = input
         batch_size, input_height, input_width, input_channels = input.shape
         
-        # init weights on first call
+        # init weights on first call with He (Kaiming) normal
         if self.weights is None:
-            # shape: (num_filters, kH, kW, input_channels)
-            self.weights = np.random.normal(0, 1, (self.no_of_filters, self.kernel_size, self.kernel_size, input_channels)) * 0.1
-            self.biases = np.random.normal(0, 1, self.no_of_filters)
+            fan_in = self.kernel_size * self.kernel_size * input_channels
+            std = np.sqrt(2.0 / fan_in)
+            self.weights = np.random.normal(0.0, std, (self.no_of_filters, self.kernel_size, self.kernel_size, input_channels))
+            self.biases = np.zeros(self.no_of_filters)
 
         # zero-pad edges so output keeps the same size
         pad = self.kernel_size // 2
@@ -212,9 +213,10 @@ class Dense:
     def forward(self, input):
         self.input = input
         n_inputs = input.shape[1]
-        # init weights on first call
+        # init weights on first call with He (Kaiming) normal
         if self.weights is None:
-            self.weights = np.random.randn(n_inputs, self.neurons) * 0.1
+            std = np.sqrt(2.0 / n_inputs)
+            self.weights = np.random.normal(0.0, std, (n_inputs, self.neurons))
             self.biases = np.zeros(self.neurons)
         
         # y = x @ W + b
