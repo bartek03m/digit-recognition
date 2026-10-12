@@ -152,19 +152,23 @@ class MaxPooling2D:
     def __init__(self, pool_size):
         self.pool_size = pool_size
         self.input = None
+        self.max_indices = None
+        self.output_shape = None
     
     def forward(self, input):
         input = np.asarray(input, dtype=np.float32)
         self.input = input
         # split into pool_size x pool_size windows
-        
         windows = sliding_window_view(input, (self.pool_size, self.pool_size), axis=(1, 2))
         
         # non-overlapping - step by pool_size
         windows = windows[:, ::self.pool_size, ::self.pool_size, :, :, :]
         
         # pick the max from each window
-        output = np.max(windows, axis=(4, 5))
+        flat_windows = windows.reshape(*windows.shape[:4], -1)
+        self.max_indices = np.argmax(flat_windows, axis=4)  # (N, out_h, out_w, C)
+        self.output_shape = (windows.shape[1], windows.shape[2])
+        output = np.max(flat_windows, axis=4)
         return output
     
     def backward(self, upstream_gradient):
@@ -172,18 +176,11 @@ class MaxPooling2D:
         batch_size, input_height, input_width, input_channels = self.input.shape
         downstream_gradient = np.zeros_like(self.input)
 
-        # get the same windows as forward
-        windows = sliding_window_view(self.input, (self.pool_size, self.pool_size), axis=(1, 2))
-        windows = windows[:, ::self.pool_size, ::self.pool_size, :, :, :]
+        output_height, output_width = self.output_shape
 
-        # find where the max was in each window
-        flat_windows = windows.reshape(*windows.shape[:4], -1)
-        max_indices = np.argmax(flat_windows, axis=4)  # (N, out_h, out_w, C)
-        _, output_height, output_width, _ = upstream_gradient.shape
-
-        # convert flat index back to 2D row/col offset within the pool window
-        max_i = max_indices // self.pool_size  # row offset
-        max_j = max_indices % self.pool_size   # col offset
+        # convert cached flat index back to 2D row/col offset within the pool window
+        max_i = self.max_indices // self.pool_size  # row offset
+        max_j = self.max_indices % self.pool_size   # col offset
 
         # build index arrays with broadcasting-friendly shapes
         n_idx = np.arange(batch_size)[:, None, None, None]       # batch axis

@@ -49,6 +49,8 @@ class Model:
                 layer.v_b = None
             if hasattr(layer, 'patches'):
                 layer.patches = None
+            if hasattr(layer, 'max_indices'):
+                layer.max_indices = None
         with open(filepath, 'wb') as f:
             pickle.dump(self, f)
         print(f"Model saved to: {filepath}")
