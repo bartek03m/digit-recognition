@@ -44,6 +44,8 @@ class Convolution2D:
             self.input = None
             self.weight_gradient = None
             self.bias_gradient = None
+            self.patches = None
+            self.output_shape = None
     
     def forward(self, input):
         input = np.asarray(input, dtype=np.float32)
@@ -78,6 +80,8 @@ class Convolution2D:
         
         # flatten patches into rows: (N*H_out*W_out, kH*kW*C)
         patches = windows.reshape(batch_size * output_height * output_width, -1)
+        self.patches = patches
+        self.output_shape = (output_height, output_width)
         # flatten filters into rows: (num_filters, kH*kW*C)
         weights_flat = self.weights.reshape(self.no_of_filters, -1)
         
@@ -97,41 +101,45 @@ class Convolution2D:
         # undo activation
         upstream_gradient *= self.activation_func.backward()
         
-        # pad again like in forward
-        pad = self.kernel_size // 2
-        input = np.pad(self.input, ((0,0),(pad,pad),(pad,pad),(0,0)))
-        
-        # same window extraction as forward
-        windows = sliding_window_view(input, (self.kernel_size, self.kernel_size), axis=(1,2))
-        windows = windows [:, ::self.strides, ::self.strides, :, :, :]
-        windows = windows.transpose(0, 1, 2, 4, 5, 3)
-
-        _, output_height, output_width, _ = upstream_gradient.shape
+        output_height, output_width = self.output_shape
         
         # dL/db = sum of gradients over all positions
         self.bias_gradient = np.sum(upstream_gradient, axis=(0, 1, 2))
         
-        # flatten for matrix math
-        patches = windows.reshape(batch_size * output_height * output_width, -1)
+        # reuse cached patches from forward pass
+        patches = self.patches
         upstream_flat = upstream_gradient.reshape(batch_size * output_height * output_width, self.no_of_filters)
         
         # dL/dW = gradient^T @ patches
         self.weight_gradient = (upstream_flat.T @ patches).reshape(self.weights.shape)
 
-        # dL/dX - gradient going to the previous layer (col2im)
+        # dL/dX - gradient going to the previous layer (vectorized col2im)
         weights_flat = self.weights.reshape(self.no_of_filters, -1)
         grad_cols = (upstream_flat @ weights_flat).reshape(
             batch_size, output_height, output_width, self.kernel_size, self.kernel_size, input_channels
         )
 
-        # put patch gradients back into their original positions
-        downstream_padded = np.zeros_like(input)
-        for oh in range(output_height):
-            for ow in range(output_width):
-                r = oh * self.strides
-                c = ow * self.strides
-                # overlapping patches just add up
-                downstream_padded[:, r:r+self.kernel_size, c:c+self.kernel_size, :] += grad_cols[:, oh, ow, :, :, :]
+        pad = self.kernel_size // 2
+        padded_h = input_height + 2 * pad
+        padded_w = input_width + 2 * pad
+        downstream_padded = np.zeros((batch_size, padded_h, padded_w, input_channels), dtype=np.float32)
+
+        # coordinate grids for vectorized col2im
+        oh_idx = (np.arange(output_height) * self.strides)[:, None, None, None]
+        ow_idx = (np.arange(output_width) * self.strides)[None, :, None, None]
+        kh_idx = np.arange(self.kernel_size)[None, None, :, None]
+        kw_idx = np.arange(self.kernel_size)[None, None, None, :]
+
+        abs_i = oh_idx + kh_idx  # (output_height, 1, kernel_size, 1)
+        abs_j = ow_idx + kw_idx  # (1, output_width, 1, kernel_size)
+
+        # broadcasted coordinates across batch and channels
+        abs_i = np.broadcast_to(abs_i, (batch_size, output_height, output_width, self.kernel_size, self.kernel_size, input_channels))
+        abs_j = np.broadcast_to(abs_j, (batch_size, output_height, output_width, self.kernel_size, self.kernel_size, input_channels))
+        n_idx = np.arange(batch_size)[:, None, None, None, None, None]
+        c_idx = np.arange(input_channels)[None, None, None, None, None, :]
+
+        np.add.at(downstream_padded, (n_idx, abs_i, abs_j, c_idx), grad_cols)
 
         # strip padding
         if pad > 0:

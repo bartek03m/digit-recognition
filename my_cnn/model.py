@@ -47,6 +47,8 @@ class Model:
                 layer.v_w = None
             if hasattr(layer, 'v_b'):
                 layer.v_b = None
+            if hasattr(layer, 'patches'):
+                layer.patches = None
         with open(filepath, 'wb') as f:
             pickle.dump(self, f)
         print(f"Model saved to: {filepath}")
@@ -58,7 +60,7 @@ class Model:
         print(f"Model loaded from: {filepath}")
         return model
         
-    def fit(self, X, y, epochs=3, batch_size=32, shuffle=True):
+    def fit(self, X, y, epochs=3, batch_size=32, shuffle=True, print_every=50):
         X = np.asarray(X, dtype=np.float32)
         y = np.asarray(y, dtype=np.float32)
         samples = X.shape[0]
@@ -101,11 +103,12 @@ class Model:
                 # update weights
                 self.optimizer.update()
 
-                # show progress
-                processed = i + len(X_batch)
-                curr_loss = total_loss / processed
-                curr_acc = correct_predictions / processed
-                print(f"\rEpoch {epoch+1}/{epochs} | Batch {batch_idx}/{total_batches} | Loss: {curr_loss:.4f} | Acc: {curr_acc:.4f}", end='', flush=True)
+                # show progress every print_every batches and on the final batch
+                if batch_idx % print_every == 0 or batch_idx == total_batches:
+                    processed = i + len(X_batch)
+                    curr_loss = total_loss / processed
+                    curr_acc = correct_predictions / processed
+                    print(f"\rEpoch {epoch+1}/{epochs} | Batch {batch_idx}/{total_batches} | Loss: {curr_loss:.4f} | Acc: {curr_acc:.4f}", end='', flush=True)
 
             print()
                 
