@@ -113,7 +113,7 @@ class Convolution2D:
         # dL/dW = gradient^T @ patches
         self.weight_gradient = (upstream_flat.T @ patches).reshape(self.weights.shape)
 
-        # dL/dX - gradient going to the previous layer (vectorized col2im)
+        # dL/dX - gradient going to the previous layer (col2im via kernel loop)
         weights_flat = self.weights.reshape(self.no_of_filters, -1)
         grad_cols = (upstream_flat @ weights_flat).reshape(
             batch_size, output_height, output_width, self.kernel_size, self.kernel_size, input_channels
@@ -124,22 +124,11 @@ class Convolution2D:
         padded_w = input_width + 2 * pad
         downstream_padded = np.zeros((batch_size, padded_h, padded_w, input_channels), dtype=np.float32)
 
-        # coordinate grids for vectorized col2im
-        oh_idx = (np.arange(output_height) * self.strides)[:, None, None, None]
-        ow_idx = (np.arange(output_width) * self.strides)[None, :, None, None]
-        kh_idx = np.arange(self.kernel_size)[None, None, :, None]
-        kw_idx = np.arange(self.kernel_size)[None, None, None, :]
-
-        abs_i = oh_idx + kh_idx  # (output_height, 1, kernel_size, 1)
-        abs_j = ow_idx + kw_idx  # (1, output_width, 1, kernel_size)
-
-        # broadcasted coordinates across batch and channels
-        abs_i = np.broadcast_to(abs_i, (batch_size, output_height, output_width, self.kernel_size, self.kernel_size, input_channels))
-        abs_j = np.broadcast_to(abs_j, (batch_size, output_height, output_width, self.kernel_size, self.kernel_size, input_channels))
-        n_idx = np.arange(batch_size)[:, None, None, None, None, None]
-        c_idx = np.arange(input_channels)[None, None, None, None, None, :]
-
-        np.add.at(downstream_padded, (n_idx, abs_i, abs_j, c_idx), grad_cols)
+        # scatter patch gradients back using slice-based += (only kernel_size^2 iterations)
+        for kh in range(self.kernel_size):
+            for kw in range(self.kernel_size):
+                downstream_padded[:, kh : kh + output_height * self.strides : self.strides,
+                                     kw : kw + output_width  * self.strides : self.strides, :] += grad_cols[:, :, :, kh, kw, :]
 
         # strip padding
         if pad > 0:
