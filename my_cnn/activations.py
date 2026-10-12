@@ -6,13 +6,14 @@ class ReLU:
         self.input = None
 
     def forward(self, input):
+        input = np.asarray(input, dtype=np.float32)
         self.input = input
         # kill negative values
         return np.maximum(0, input)
         
     def backward(self):
         # 1 where positive, 0 otherwise
-        return (self.input > 0).astype(float)
+        return (self.input > 0).astype(np.float32)
     
     
 class Softmax:
@@ -21,6 +22,7 @@ class Softmax:
         self.input = None
 
     def forward(self, input):
+        input = np.asarray(input, dtype=np.float32)
         self.input = input
         # subtract max to prevent overflow
         max_vals = np.max(input, axis=1, keepdims=True)
@@ -38,7 +40,7 @@ class Linear:
         pass
     
     def forward(self, input):
-        return input
+        return np.asarray(input, dtype=np.float32)
          
     def backward(self):
         return 1

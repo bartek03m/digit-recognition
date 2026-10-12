@@ -8,7 +8,7 @@ class SGD:
 
     def lazy_load(self, layers, learning_rate):
         self.layers = layers
-        self.learning_rate = learning_rate
+        self.learning_rate = np.float32(learning_rate)
         
     def update(self):
         """Update weights and biases for trainable layers"""
@@ -25,11 +25,11 @@ class Momentum:
     def __init__(self, beta=0.9):
         self.layers = None
         self.learning_rate = None
-        self.beta = beta
+        self.beta = np.float32(beta)
 
     def lazy_load(self, layers, learning_rate):
         self.layers = layers
-        self.learning_rate = learning_rate
+        self.learning_rate = np.float32(learning_rate)
 
     def update(self):
         """Update weights and biases with momentum"""

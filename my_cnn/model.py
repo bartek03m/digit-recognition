@@ -21,7 +21,7 @@ class Model:
 
     def predict(self, X):
         # run through all layers
-        out = self.layers[0].forward(X)
+        out = self.layers[0].forward(np.asarray(X, dtype=np.float32))
         for i in range(1, len(self.layers)):
              out = self.layers[i].forward(out)
         return out
@@ -59,6 +59,8 @@ class Model:
         return model
         
     def fit(self, X, y, epochs=3, batch_size=32, shuffle=True):
+        X = np.asarray(X, dtype=np.float32)
+        y = np.asarray(y, dtype=np.float32)
         samples = X.shape[0]
         total_batches = (samples + batch_size - 1) // batch_size
 
@@ -108,6 +110,8 @@ class Model:
             print()
                 
     def evaluate(self, X, y):
+        X = np.asarray(X, dtype=np.float32)
+        y = np.asarray(y, dtype=np.float32)
         y_pred = self.predict(X)
 
         loss_val = self.loss.forward(y, y_pred)
@@ -117,5 +121,4 @@ class Model:
         acc = np.sum(preds==trues) / len(y)
 
         return loss_val, acc        
-
 

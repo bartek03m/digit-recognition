@@ -8,10 +8,10 @@ class Input:
         self.shape = shape
         
     def forward(self, input):
-        return input
+        return np.asarray(input, dtype=np.float32)
     
     def backward(self, upstream_gradient):
-        return upstream_gradient
+        return np.asarray(upstream_gradient, dtype=np.float32)
     
 
 class Rescaling:
@@ -20,10 +20,10 @@ class Rescaling:
         self.scale = scale
     
     def forward(self, input):
-        return input * self.scale
+        return np.asarray(input, dtype=np.float32) * np.float32(self.scale)
 
     def backward(self, upstream_gradient):
-        return upstream_gradient * self.scale
+        return np.asarray(upstream_gradient, dtype=np.float32) * np.float32(self.scale)
     
     
 class Convolution2D:
@@ -46,6 +46,7 @@ class Convolution2D:
             self.bias_gradient = None
     
     def forward(self, input):
+        input = np.asarray(input, dtype=np.float32)
         self.input = input
         batch_size, input_height, input_width, input_channels = input.shape
         
@@ -53,8 +54,12 @@ class Convolution2D:
         if self.weights is None:
             fan_in = self.kernel_size * self.kernel_size * input_channels
             std = np.sqrt(2.0 / fan_in)
-            self.weights = np.random.normal(0.0, std, (self.no_of_filters, self.kernel_size, self.kernel_size, input_channels))
-            self.biases = np.zeros(self.no_of_filters)
+            self.weights = np.random.normal(
+                0.0,
+                std,
+                (self.no_of_filters, self.kernel_size, self.kernel_size, input_channels),
+            ).astype(np.float32)
+            self.biases = np.zeros(self.no_of_filters, dtype=np.float32)
 
         # zero-pad edges so output keeps the same size
         pad = self.kernel_size // 2
@@ -87,6 +92,7 @@ class Convolution2D:
         return output
     
     def backward(self, upstream_gradient):
+        upstream_gradient = np.asarray(upstream_gradient, dtype=np.float32)
         batch_size, input_height, input_width, input_channels = self.input.shape
         # undo activation
         upstream_gradient *= self.activation_func.backward()
@@ -140,6 +146,7 @@ class MaxPooling2D:
         self.input = None
     
     def forward(self, input):
+        input = np.asarray(input, dtype=np.float32)
         self.input = input
         # split into pool_size x pool_size windows
         
@@ -153,8 +160,9 @@ class MaxPooling2D:
         return output
     
     def backward(self, upstream_gradient):
+        upstream_gradient = np.asarray(upstream_gradient, dtype=np.float32)
         batch_size, input_height, input_width, input_channels = self.input.shape
-        downstream_gradient = np.zeros(self.input.shape)
+        downstream_gradient = np.zeros_like(self.input)
 
         # get the same windows as forward
         windows = sliding_window_view(self.input, (self.pool_size, self.pool_size), axis=(1, 2))
@@ -190,6 +198,7 @@ class Flatten:
         self.input = None
 
     def forward(self, input):
+        input = np.asarray(input, dtype=np.float32)
         self.input = input
         # squash (H, W, C) into one dimension
         output = input.reshape((input.shape[0], -1))
@@ -197,7 +206,7 @@ class Flatten:
     
     def backward(self, upstream_gradient):
         # reshape back to (N, H, W, C)
-        return upstream_gradient.reshape(self.input.shape)
+        return np.asarray(upstream_gradient, dtype=np.float32).reshape(self.input.shape)
     
     
 class Dense:
@@ -212,13 +221,14 @@ class Dense:
         self.bias_gradient = None
 
     def forward(self, input):
+        input = np.asarray(input, dtype=np.float32)
         self.input = input
         n_inputs = input.shape[1]
         # init weights on first call with He (Kaiming) normal
         if self.weights is None:
             std = np.sqrt(2.0 / n_inputs)
-            self.weights = np.random.normal(0.0, std, (n_inputs, self.neurons))
-            self.biases = np.zeros(self.neurons)
+            self.weights = np.random.normal(0.0, std, (n_inputs, self.neurons)).astype(np.float32)
+            self.biases = np.zeros(self.neurons, dtype=np.float32)
         
         # y = x @ W + b
         output = np.dot(input, self.weights) + self.biases
@@ -226,6 +236,7 @@ class Dense:
         return output
     
     def backward(self, upstream_gradient):
+        upstream_gradient = np.asarray(upstream_gradient, dtype=np.float32)
         # undo activation
         upstream_gradient *= self.activation_func.backward()
         # dL/dW
